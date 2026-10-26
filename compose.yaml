@@ -1,0 +1,71 @@
+services:
+  api:
+    build: .
+    image: cloudflow-backend:latest
+    environment:
+      CLOUDFLOW_AUTO_WORKER: "false"
+      CLOUDFLOW_WORKSPACE: /workspace
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    volumes:
+      - cloudflow-data:/workspace
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  worker:
+    build: .
+    image: cloudflow-backend:latest
+    command: ["python", "-m", "orchestrator.worker"]
+    environment:
+      CLOUDFLOW_AUTO_WORKER: "false"
+      CLOUDFLOW_WORKSPACE: /workspace
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    volumes:
+      - cloudflow-data:/workspace
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 4g
+    cpus: 2.0
+    pids_limit: 128
+    init: true
+    restart: unless-stopped
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+  mlflow:
+    image: cloudflow-backend:latest
+    command: ["mlflow", "ui", "--backend-store-uri", "sqlite:////workspace/mlflow.db", "--host", "0.0.0.0", "--port", "5000"]
+    profiles: [tracking]
+    volumes:
+      - cloudflow-data:/workspace
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on: [api]
+volumes:
+  cloudflow-data:

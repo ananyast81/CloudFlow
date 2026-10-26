@@ -37,7 +37,7 @@ def split_dataset(
 
     stratify_labels = y
 
-    X_train, X_test, y_train, y_test = train_test_split(
+  X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
         test_size=n_test,
@@ -46,11 +46,11 @@ def split_dataset(
         stratify=stratify_labels,
     )
 
-    if training_input.task_type == "classification":
+  if training_input.task_type == "classification":
       expected_classes = set(y.unique())
 
       if(
         set(y_train.unique()) != expected_classes or set(y_test.unique()) != expected_classes):
         raise ValueError("Some classes are missing from the split. Add more examples of rare classes or review the train/test proportions.")
 
-    return X_train, X_test, y_train, y_test
+  return X_train, X_test, y_train, y_test

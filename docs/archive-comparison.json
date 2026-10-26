@@ -1,0 +1,17 @@
+{
+  "archives": [
+    {
+      "name": "CloudFlow-feature-modeling-pipeline.zip",
+      "sha256": "8b5bc876bcf6603b52de2a7d7b9edfa3d9bccc70ab32fb9e851bd039828c77a4",
+      "original_files": 127
+    },
+    {
+      "name": "CloudFlow-main.zip",
+      "sha256": "d1c0e20d59033f98fa31bbf0b54f55c66b2e342825e43698a681514c50b4448a",
+      "original_files": 127
+    }
+  ],
+  "identical_relative_file_contents": true,
+  "base_used": "CloudFlow-feature-modeling-pipeline.zip",
+  "originals_modified": false
+}

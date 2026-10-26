@@ -20,3 +20,10 @@ frontend/node_modules/
 # Test and development files
 .pytest_cache/
 .mypy_cache/
+.audit/
+output/
+artifacts/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+*.log

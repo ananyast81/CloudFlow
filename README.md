@@ -1,386 +1,231 @@
 # CloudFlow
 
-A multi-container, question-driven data analysis pipeline. Give it a dataset and a plain-English question; it analyzes the data, answers with evidence, and generates a report covering its workflow, decisions, findings, and limitations.
+A five-agent data science workspace that turns a CSV and a natural-language prediction question into an inspected dataset, a human-reviewed modeling plan, trained models, diagnostics, explanations and a reproducible report.
 
-> **Status:** Early prototype. The FastAPI backend, frontend integration, and Dockerized Data Prep Agent are implemented. The remaining analysis stages and complete end-to-end pipeline are still under development.
+**Implemented stack:** Python, LangGraph, FastAPI, Pandas, NumPy, scikit-learn, XGBoost, Matplotlib, Plotly, SHAP, MLflow, React, Vite and Docker. Gemini and Groq reasoning are supported through optional server-side configuration. Local planning runs without an API key.
 
-## What It Does
+## Features and workflow
 
-**Input:** A dataset such as `churn.csv` and a question such as:
+Upload and preview a CSV, define a prediction objective, review the proposed training plan, compare trained models, inspect diagnostics, make predictions, and download reports and artifacts. Run History preserves past analyses; Experiments shows candidate models and tracking details. The frontend uses actual backend state and results.
 
-> Which factors are associated with customer churn, and can we predict who will leave?
+### Five agents, six workflow stages
 
-**Output:** A data preparation result, structured report, and supporting artifacts. The intended final output includes an evidence-backed answer, relevant findings, and the notebooks and artifacts needed to inspect and reproduce the analysis.
+| Order | Runtime stage | Responsibility |
+| --- | --- | --- |
+| 1 | `data_understanding` | Profile and clean the dataset |
+| 2 | `analysis_features` | Explore training data and propose features and a plan |
+| 3 | `human_review` | Human approval, supported plan edits, or rejection |
+| 4 | `modeling` | Train and compare candidate models |
+| 5 | `evaluation` | Evaluate the selected model and diagnose errors |
+| 6 | `reporting` | Explain findings and generate reports |
 
-Not every question requires machine learning. A descriptive question may only need exploratory data analysis or a verified calculation.
+**Human review is a checkpoint, not an autonomous agent.** The orchestrator coordinates five specialist agents and this review stage. Training waits for approval. Changing the target or problem type rebuilds the analysis and requests another review.
 
-## Architecture and Workflow
+The mission-control frontend redesign presents these stages around an Orchestrator Orbit, with a selected-stage dossier, execution logs, and dark navy/lime styling. That frontend change is separate from this README update: the layout available in a checkout depends on whether the frontend redesign has been incorporated. Six orbit nodes represent six stages, not six AI agents.
 
-```text
-User: Dataset + Question
-          |
-          v
-Frontend (React + Vite)
-          |
-          v
-FastAPI Backend
-          |
-          v
-Orchestrator / Planner (planned)
-          |
-          v
-1. Data Prep Agent
-   - Profiles the dataset
-   - Plans and executes cleaning operations
-   - Saves the cleaned dataset and preparation report
-          |
-          v
-2. EDA Agent (planned)
-   - Question-relevant statistics and charts
-          |
-          v
-3. Feature Engineering & ML Agent (planned)
-   - Feature preparation, model training and evaluation
-          |
-          v
-4. Evaluation & Report Agent (planned)
-   - Verifies findings and generates the final report
-          |
-          v
-Answer + Report + Supporting Artifacts
+See [synopsis alignment](docs/SYNOPSIS_ALIGNMENT.md), [architecture](docs/ARCHITECTURE.md), and [verification](docs/VERIFICATION.md) for implementation details.
+
+## Storage
+
+React/Vite communicates with FastAPI through `/api`; LangGraph coordinates execution and the background worker runs training and reporting.
+
+| Default location | Purpose |
+| --- | --- |
+| `workspace/runs.sqlite` | Run records and execution events |
+| `workspace/checkpoints.sqlite` | LangGraph workflow checkpoints and review pauses |
+| `workspace/mlflow.db` | Local MLflow experiment tracking |
+| `workspace/<run_id>/` | Datasets, fitted models, charts, reports, and reproducibility files |
+| `workspace/mlartifacts/` | Local MLflow artifacts |
+
+SQLite requires no separate database server. Preserve the workspace across restarts and deployments. `CLOUDFLOW_WORKSPACE` and `MLFLOW_TRACKING_URI` can override the defaults.
+
+## Quick start on Windows
+
+Requirements: Python 3.11 and Node.js 22.12+ or 24+.
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+cd frontend
+npm ci
+cd ..
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+.\.venv\Scripts\python.exe -m scripts.dev
 ```
 
-Currently, the FastAPI backend launches the Data Prep Agent in a separate Docker container for each pipeline run. The container processes the uploaded dataset and writes its outputs to a shared workspace.
+Open **http://localhost:5173**. The launcher starts FastAPI, its automatic background worker and Vite. Press Ctrl+C in the launcher terminal to stop its processes. `./scripts/start.ps1 -Install` is an alternative setup-and-launch helper.
 
-The remaining agents and orchestrator will extend this workflow as development progresses.
+When dependencies are already installed, only the final command is needed. Do not place an LLM key in the frontend environment.
 
-### Agent Outputs
+`requirements.lock.txt` records the exact tested Windows/Python 3.11 packages. Use `pip install -r requirements.lock.txt` to recreate that environment; `requirements.txt` provides the cross-platform dependency ranges. Linux/macOS and Docker have not been runtime-tested on this Windows host.
 
-| Stage | Key outputs | Status |
-|---|---|---|
-| Data Prep | Cleaned dataset, initial profile, operation plan, preparation report, notebook artifacts | Implemented |
-| EDA | Findings, statistics, charts, notebook | Planned |
-| Feature Engineering & ML | Features, model, predictions, evaluation results, notebook | Planned |
-| Evaluation & Report | Final answer, report, evidence references | Planned |
+Screenshots in `docs/screenshots/` document an earlier frontend revision, rather than the mission-control redesign.
 
----
-
-# Setup and Installation
-
-## Prerequisites
-
-Install the following:
-
-- Python 3.10+
-- Git
-- Node.js and npm
-- Docker Engine
-- An API key from a supported OpenAI-compatible LLM provider, such as [Groq](https://console.groq.com/)
-
-Docker must be running, and the user running the FastAPI backend must have permission to execute Docker commands.
-
-On Windows, use **WSL2** and preferably keep the repository inside the WSL filesystem.
-
-The instructions below assume Ubuntu or another Linux environment.
-
-## 1. Clone the Repository
-
-```bash
-git clone https://github.com/ananyast81/CloudFlow.git
-cd CloudFlow
-```
-
-## 2. Create a Python Virtual Environment
+### Start again after installation
 
 From the repository root:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+```powershell
+.\.venv\Scripts\python.exe -m scripts.dev
 ```
 
-If creating the virtual environment fails on Ubuntu, install the required packages:
+Alternatively, use two PowerShell terminals starting at the repository root:
 
-```bash
-sudo apt update
-sudo apt install python3-venv python3-pip
+```powershell
+# Terminal 1: backend and automatic worker
+.\.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Verify that the virtual environment is active:
-
-```bash
-which python
-```
-
-The returned path should point to the repository's `.venv` directory.
-
-## 3. Install Backend Dependencies
-
-With the virtual environment activated, run:
-
-```bash
-pip install -r requirements.txt
-```
-
-The root requirements file contains dependencies needed by the development environment and backend.
-
-## 4. Configure the LLM
-
-Create a `.env` file in the repository root:
-
-```bash
-touch .env
-```
-
-Add your provider configuration:
-
-```env
-# Groq
-LLM_BASE_URL=https://api.groq.com/openai/v1
-LLM_API_KEY=your_api_key
-LLM_MODEL=openai/gpt-oss-120b
-```
-
-Replace `your_api_key` with your actual API key.
-
-Model availability and names can change. If the provider returns a `model_not_found` error, check its current list of supported models.
-
-The backend loads the root `.env` file, and the Dockerized Data Prep Agent receives the configured LLM environment variables when the backend launches it.
-
-**Keep `.env` private. Do not commit API keys or other secrets to Git.**
-
-## 5. Build the Data Prep Agent Docker Image
-
-Make sure Docker is running:
-
-```bash
-docker info
-```
-
-Build the image from the **repository root**:
-
-```bash
-docker build \
-  -f agents/data_prep_agent/Dockerfile \
-  -t cloudflow-data-prep:latest \
-  .
-```
-
-The final `.` is important: it sets the repository root as the Docker build context, allowing the Dockerfile to copy the agent and shared modules.
-
-Verify that the image was created:
-
-```bash
-docker images cloudflow-data-prep
-```
-
-The backend uses this image to execute the Data Prep Agent for each pipeline run.
-
-You only need to rebuild the image when you change code or dependencies included in the image.
-
-### Docker Ignore Configuration
-
-The repository root should contain a `.dockerignore` file to exclude local files that should not be included in the build context.
-
-Example:
-
-```text
-.venv/
-.git/
-data/
-workspace/
-out/
-__pycache__/
-*.pyc
-.env
-```
-
-This keeps local datasets, run artifacts, environment files, and development files out of the image build context.
-
-The `.env` file is supplied to the container through the backend's environment configuration rather than being copied into the image.
-
----
-
-# Running CloudFlow
-
-Start the backend and frontend in separate terminals. Build the Docker image before starting a pipeline run.
-
-## 6. Start the FastAPI Backend
-
-Open a terminal and navigate to the repository root:
-
-```bash
-cd ~/CloudFlow
-source .venv/bin/activate
-```
-
-Start the backend:
-
-```bash
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The backend will be available at:
-
-- **API base URL:** `http://localhost:8000`
-- **Interactive API documentation:** `http://localhost:8000/docs`
-- **Health check:** `http://localhost:8000/health`
-
-The `--reload` option automatically restarts the development server when Python files change.
-
-### Verify the Backend
-
-In another terminal, run:
-
-```bash
-curl http://localhost:8000/health
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-You can also open `http://localhost:8000/docs` in your browser to inspect the available API endpoints.
-
-### Available Endpoints
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/health` | Check whether the backend is responding |
-| `POST` | `/runs` | Upload a dataset, provide an objective, and start a pipeline run |
-| `GET` | `/runs` | Retrieve the run records held by the backend |
-| `GET` | `/runs/{run_id}` | Retrieve the status and results of a specific run |
-
-### How a Pipeline Run Executes
-
-When a user submits a dataset and objective through `POST /runs`:
-
-1. The backend validates the objective and accepts the uploaded CSV.
-2. The uploaded dataset is saved under `workspace/<run_id>/input.csv`.
-3. The backend creates a run record and returns a run ID.
-4. A background task launches the `cloudflow-data-prep:latest` Docker image.
-5. The container processes the dataset and writes its outputs to the shared workspace.
-6. The backend reads the container status and preparation report.
-7. The run record is updated with its final status and results.
-
-The run status generally progresses through:
-
-```text
-queued -> running -> completed -> failed
-```
-
-The frontend can poll `GET /runs/{run_id}` to retrieve the current status and results.
-
-**Important:** Keep Docker running while executing pipeline runs. If you change the Data Prep Agent's code, rebuild its Docker image before testing the changes.
-
-## 7. Start the Frontend
-
-Open a second terminal:
-
-```bash
-cd ~/CloudFlow/frontend
-npm install
+```powershell
+# Terminal 2: frontend
+cd frontend
 npm run dev
 ```
 
-Vite will print the local development URL, typically:
+Choose the combined launcher or the separate terminals to avoid duplicate servers. Keep the terminals open and press Ctrl+C to stop. Confirm <http://localhost:8000/api/health> responds before uploading. If an upload returns 502, inspect both terminal outputs and check that the frontend proxy can reach the backend on port 8000.
+
+## Quick start on Linux/macOS
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cd frontend && npm ci && cd ..
+cp .env.example .env
+python -m scripts.dev
+```
+
+To run separate terminals:
+
+```bash
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+# another terminal:
+cd frontend
+npm run dev
+```
+
+The API automatically starts a worker unless `CLOUDFLOW_AUTO_WORKER=false`. When using that setting, start `python -m orchestrator.worker` separately. Use the same `CLOUDFLOW_WORKSPACE` for API and worker. A single automatic API process is sufficient; do not enable several reloaders against one local workspace.
+
+- UI: http://localhost:5173
+- API documentation: http://localhost:8000/docs
+- Health: http://localhost:8000/api/health
+
+## Try a complete analysis
+
+1. Upload `data/churn.csv` (synthetic customer classification) or `data/housing.csv` (synthetic price regression).
+2. Describe the goal, such as “Predict Churn and explain the most influential customer characteristics.” Select `Churn` as the target, or `price` for the housing sample.
+3. Launch analysis. Data Understanding inspects/cleans the dataset; Analysis & Features produces training-only EDA and a feature proposal.
+4. At **Your review**, inspect and optionally edit the target, task, features, models and preprocessing. Choose **Approve & train**. Changing the target/task rebuilds analysis and asks for review again.
+5. Watch model training and diagnostic feedback in Activity. Open **Results & diagnostics** for CV comparisons, final holdout metrics and interactive charts.
+6. Open **Predict** to submit new raw feature values to the trained pipeline. Use **Artifacts → Download all** to save the report and reproducibility bundle.
+
+The original three-row `sample_orders.csv` remains as a tiny EDA fixture; it is not a trainable demo. The supplied synthetic samples can be regenerated with `python -m scripts.generate_samples`.
+
+## Optional Gemini/Groq reasoning
+
+Edit the root `.env`:
+
+```dotenv
+LLM_PROVIDER=groq
+LLM_API_KEY=your-provider-key
+LLM_MODEL=a-model-available-in-your-provider-account
+```
+
+For Gemini, set `LLM_PROVIDER=gemini` with a Gemini API key and model identifier. Restart the API/worker, then enable **Use AI reasoning** on the new-analysis form. The configuration page shows readiness and never returns the key. This sends the objective, column summaries and computed findings to the selected provider. Numerical processing and metric computation remain deterministic Python operations.
+
+If a provider request fails or violates the expected schema, the run records a warning and continues with local reasoning. Reports distinguish measured results from optional AI interpretation. Without a key, leave `LLM_PROVIDER=none`.
+
+## Docker deployment
+
+Install and start Docker Engine/Desktop first. From the repository root:
+
+```bash
+docker compose up --build -d
+```
+
+Open **http://localhost:8080**. Compose runs an Nginx frontend, FastAPI and a separate resource-limited worker. The named `cloudflow-data` volume preserves run records, LangGraph checkpoints, models and MLflow records. Ports bind to localhost.
+
+```bash
+docker compose logs -f api worker
+docker compose down
+# Optional MLflow browser interface:
+docker compose --profile tracking up -d
+```
+
+MLflow UI: http://localhost:5000. Do not use `docker compose down -v` unless you intend to delete persisted analyses. The root Dockerfile is the supported build; agent-directory Dockerfiles are compatibility wrappers around `cloudflow-backend:latest`.
+
+## Experiment tracking
+
+Every successful candidate logs its parameters, random seed, metric, CV scores, duration and serialized fitted model to MLflow. The selected candidate also receives holdout metrics and report artifacts. The in-app Experiments page works from persisted workflow state and shows whether each candidate was logged to MLflow.
+
+Default tracking storage is `workspace/mlflow.db`; model/report artifacts are under `workspace/mlartifacts`. To inspect locally:
+
+```bash
+python -m mlflow ui --backend-store-uri sqlite:///workspace/mlflow.db --host 127.0.0.1 --port 5000
+```
+
+Set `MLFLOW_TRACKING_URI` for a separately managed tracking server in local development. MLflow failures are visible warnings; local model artifacts remain available.
+
+## Results and reproducibility
+
+Each run has an isolated `workspace/<run_id>/` directory. Downloads include:
+
+- Cleaned raw data and transformed training/test feature matrices.
+- Approved plan, data profile, cleaning summary, EDA statistics and PNG charts.
+- Candidate pipelines, selected `model.joblib`, CV results, held-out predictions and metrics.
+- SHAP importance and local explanations, or an explicitly identified fallback.
+- Interactive Plotly chart JSON; final report in HTML, Markdown and JSON.
+- A reproduction notebook and JSON metadata with split indices, hashes, seeds and package versions.
+
+The model bundle contains the entire fitted preprocessing pipeline. It is trained on the training partition, preserving the independence of the reported holdout. The exported notebook is provided for reproduction and is not represented as an executed notebook.
+
+The HTML report embeds all EDA PNG images and the Plotly runtime. Downloading `report.html` alone is sufficient to open its images and charts offline; the individual PNGs also remain available in the artifact ZIP. Previously downloaded HTML files are unchanged by a project update: download the report again after refreshing an older run's export:
+
+```bash
+python -m scripts.repair_reports --all-completed
+# Or refresh one completed run:
+python -m scripts.repair_reports --run-id <run_id>
+```
+
+This rebuilds the HTML from saved images and chart data without retraining, recomputing metrics or calling an LLM.
+
+From the project environment, verify a run or extracted artifact bundle:
+
+```bash
+python -m scripts.reproduce --run-dir workspace/<run_id>
+```
+
+This rebuilds the winning candidate from its recorded configuration and checks that holdout predictions match. Use the package versions recorded in `reproducibility.json`; fitted Python model files should only be loaded from trusted sources.
+
+## API integration
+
+All frontend requests use one client in `frontend/src/lib/api.js`. The default base is `/api`: Vite proxies it locally and Nginx proxies it in Docker. `frontend/.env.example` documents `VITE_API_BASE_URL` for an alternative backend.
+
+The primary flow is:
 
 ```text
-http://localhost:5173
+POST /api/datasets/preview
+POST /api/runs
+GET  /api/runs/{id}          (poll)
+GET  /api/runs/{id}/events   (activity)
+POST /api/runs/{id}/approval
+GET  /api/runs/{id}          (poll to terminal state)
+GET  /api/runs/{id}/download
+POST /api/runs/{id}/predict
 ```
 
-Open that address in your browser.
+See [REST contracts and examples](docs/API.md). Run creation returns 202 acceptance; completion occurs only after all five agents and reporting have finished. Repeated approval and terminal-state mutations return 409. Artifact downloads are scoped to registered paths within the selected run.
 
-Ensure the FastAPI backend is running on port `8000` and that the frontend's API configuration points to the correct backend URL.
-
----
-
-# Development and Troubleshooting
-
-## Check Docker
-
-If a pipeline run fails to start, verify that Docker is available:
+## Development checks
 
 ```bash
-docker info
+python -m pytest
+python -m compileall -q api agents shared orchestrator scripts tests
+cd frontend
+npm run lint
+npm run build
+# With API/worker and Vite running:
+npx playwright test
 ```
 
-Check whether the agent image exists:
-
-```bash
-docker images cloudflow-data-prep
-```
-
-Inspect running containers:
-
-```bash
-docker ps
-```
-
-Because the backend runs the agent with automatic container removal, a successfully completed container may no longer appear in `docker ps`.
-
-## Inspect Run Artifacts
-
-After submitting a dataset, inspect the corresponding workspace directory:
-
-```bash
-ls -R workspace/<run_id>
-```
-
-Replace `<run_id>` with the actual ID returned by the API.
-
-Check the container status:
-
-```bash
-cat workspace/<run_id>/container_status.json
-```
-
-Inspect the preparation report:
-
-```bash
-cat workspace/<run_id>/data-prep/preparation_report.json
-```
-
-These files can help distinguish a data preparation failure from an API or container-launching problem.
-
-## Inspect Backend Logs
-
-The backend terminal displays request logs and output captured from the Data Prep Agent container.
-
-If a run fails, inspect these logs first. They may contain the underlying Python exception or Docker error.
-
-## Common Issues
-
-| Problem | What to check |
-|---|---|
-| `ModuleNotFoundError` | Activate `.venv` and install the root requirements |
-| Docker image not found | Build `cloudflow-data-prep:latest` from the repository root |
-| Docker permission denied | Verify Docker is running and the backend user has Docker permissions |
-| LLM authentication error | Check `LLM_API_KEY` in the root `.env` file |
-| LLM model not found | Verify that `LLM_MODEL` is supported by your provider |
-| Pipeline run fails | Inspect backend logs and `container_status.json` |
-| `/runs` returns no records after restarting | Run records are currently in memory and are cleared when the backend restarts |
-| Frontend cannot reach the backend | Confirm that Uvicorn is running on port `8000` and check the frontend API configuration |
-
----
-
-
-# Roadmap
-
-Planned development includes:
-
-- Implementing the EDA Agent.
-- Implementing the Feature Engineering and ML Agent.
-- Implementing evaluation and final report generation.
-- Building the orchestrator to coordinate the agents.
-- Adding persistent run tracking.
-- Improving execution isolation, error handling, and resource management.
-- Integrating the complete pipeline with the frontend.
-- Adding Docker Compose configuration for easier multi-service development.
-
----
+Playwright is configured for installed Microsoft Edge. On Linux, install a Playwright-supported browser and adjust the configured channel. Tests use synthetic data and actually execute both classification and regression workflows; provider transport tests use mocks and do not require credentials. See [verification results](docs/VERIFICATION.md) for exactly what was run.

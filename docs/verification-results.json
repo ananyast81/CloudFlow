@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-26",
+  "platform": "Windows x64",
+  "python": "3.11.9",
+  "node": "24.13.0",
+  "npm": "11.6.2",
+  "backend_tests": 30,
+  "backend_failures": 0,
+  "backend_errors": 0,
+  "original_utility_checks": 20,
+  "browser_tests": 2,
+  "production_build": "passed",
+  "eslint": "passed",
+  "pip_check": "passed",
+  "docker_runtime": "not tested: Docker Engine unavailable",
+  "live_llm": "not tested: no provider credentials configured",
+  "standalone_report_repair": {
+    "targeted_backend_tests": 13,
+    "targeted_backend_failures": 0,
+    "repaired_user_report_offline_images": 6,
+    "repaired_user_report_offline_charts": 3,
+    "repaired_user_report_page_errors": 0,
+    "original_models_and_findings_unchanged": true,
+    "browser_tests": 2,
+    "browser_failures": 0,
+    "eslint": "passed",
+    "python_compile": "passed"
+  }
+}

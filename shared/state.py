@@ -30,10 +30,5 @@ class DataPrepResult(BaseModel):
     cleaned_dataset_path: list[str]
 
 
-# ---------- Pipeline state ----------
-class PipelineState(BaseModel):
-    run_id: int
-    problem_stmt: str
-    dataset_path: str
-    target_col: Optional[str] = None
-    data_prep: Optional[DataPrepResult] = None
+# The application has one canonical, validated cross-agent state.
+from shared.contracts import PipelineState

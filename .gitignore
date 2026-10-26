@@ -3,14 +3,21 @@ __pycache__/
 .env
 venv/
 .venv/
-*.csv
-# For testing
-data
-workspace
-# Allow frontend mock data source files
-!frontend/src/data/
-!frontend/src/data/**
+workspace/
+.audit/
+output/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+*.log
+*.db
+*.db-*
+*.sqlite*
+mlruns/
+mlartifacts/
 
 # Generated artifacts
 artifacts/runs/
-*.joblib
+*.joblib

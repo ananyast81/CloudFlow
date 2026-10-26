@@ -169,8 +169,7 @@ def save_correlation_heatmap(
 
     axes = figure.subplots()
 
-    cmap = colormaps["RdBu_r"].copy()
-    cmap.set_bad("#e5e7eb")
+    cmap = colormaps["RdBu_r"].with_extremes(bad="#e5e7eb")
 
     image = axes.imshow(
         np.ma.masked_invalid(matrix),
