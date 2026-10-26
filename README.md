@@ -123,6 +123,8 @@ The original three-row `sample_orders.csv` remains as a tiny EDA fixture; it is 
 
 ## Optional Gemini/Groq reasoning
 
+See [LLM integration and verification](docs/LLM_INTEGRATION.md) for configuration, evidence boundaries, per-stage success/fallback labels, executed checks, and remaining scope. The configured badge indicates presence of configuration, not successful provider use.
+
 Edit the root `.env`:
 
 ```dotenv

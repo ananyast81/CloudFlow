@@ -26,7 +26,7 @@ class Settings:
 
     @property
     def llm_ready(self) -> bool:
-        return self.llm_provider in {"groq", "gemini"} and bool(self.llm_api_key and self.llm_model)
+        return self.llm_provider in {"groq", "gemini"} and bool(self.llm_api_key.strip() and self.llm_model.strip())
 
     @property
     def tracking_uri(self) -> str:

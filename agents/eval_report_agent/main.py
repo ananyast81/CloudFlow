@@ -14,7 +14,7 @@ from agents.eval_report_agent.html_report import write_html_report
 from shared.contracts import PipelineState
 from shared.files import write_json
 from shared.data import load_prepared
-from shared.llm import Reasoner, ReportNarrative
+from shared.llm import LLMError, Reasoner, ReportNarrative, record_usage
 
 
 def run(state: PipelineState, run_dir: Path, settings) -> dict:
@@ -51,15 +51,27 @@ def run(state: PipelineState, run_dir: Path, settings) -> dict:
     if not evaluation["beats_baseline"]:
         recommendations.insert(0, "Collect better predictors or more representative data before considering deployment.")
     narrative = None
+    narration_status, narration_error = "disabled", None
     if state.options.use_llm:
         try:
             narrative = Reasoner(settings).request("Interpret the evidence and suggest next steps. Do not introduce new numerical claims.",
-                {"objective": state.objective, "answer": answer, "evaluation": evaluation,
-                 "top_features": explanation["importance"][:8], "warnings": warnings}, ReportNarrative).model_dump()
+                {"objective": state.objective, "answer": answer,
+                 "evaluation": {key: evaluation[key] for key in (
+                     "metrics", "primary_metric", "primary_score", "baseline_score", "beats_baseline", "test_rows"
+                 ) if key in evaluation},
+                 "top_features": [{"feature": item["feature"][:240], "importance": item["importance"]}
+                                  for item in explanation["importance"][:8]],
+                 "warning_count": len(warnings)}, ReportNarrative).model_dump()
+            narration_status = "succeeded"
         except Exception as exc:
-            warnings.append(f"AI report narrative unavailable ({type(exc).__name__}); evidence-based local report retained.")
+            narration_status = "fallback"
+            narration_error = exc.code if isinstance(exc, LLMError) else type(exc).__name__
+            warnings.append(f"AI report narrative unavailable ({narration_error}); evidence-based local report retained.")
+    usage = record_usage(run_dir, settings, "narration", narration_status, narration_error)
+    planning = usage.get("planning", {"status": "unknown"})
+    planning_mode = planning.get("provider", "local") if planning["status"] == "succeeded" else "local"
     report = {"title": "CloudFlow analysis report", "run_id": state.run_id, "objective": state.objective,
-        "answer": answer, "planning_mode": settings.llm_provider if state.options.use_llm else "local",
+        "answer": answer, "planning_mode": planning_mode,
         "plan": state.plan.model_dump(), "dataset_summary": state.profile, "preparation": state.preparation,
         "eda_scope": "Training rows only", "eda_findings": {
             "excluded_features": state.eda.get("excluded_features", {}),
@@ -72,6 +84,9 @@ def run(state: PipelineState, run_dir: Path, settings) -> dict:
         "ai_narrative": narrative, "limitations": evaluation["limitations"]}
     write_json(run_dir / "report.json", report)
     markdown = ["# CloudFlow analysis report", "", state.objective, "", "## Answer", answer,
+        "", "## AI usage",
+        f"Planning: {planning['status']}; narration: {narration_status}. See llm-usage.json for configuration and outcomes.",
+        "Configured does not mean successfully used. AI interpretation is separate from measured results.",
         "", "## Dataset and preparation", f"{state.profile['rows']} raw rows; {state.preparation['rows_after']} cleaned rows.",
         *[f"- {step}" for step in state.preparation["steps"]], "", "## Approved plan",
         f"Target: {state.plan.target_column}; task: {state.plan.task_type}.",
